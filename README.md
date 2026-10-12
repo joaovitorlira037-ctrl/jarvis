@@ -20,6 +20,14 @@ Se a chave já estiver preenchida mas o painel ainda pedir configuração:
 - Execute `DIAGNOSTICAR_JARVIS.bat` para conferir a pasta, a presença das chaves e o estado do servidor. O diagnóstico não imprime valores secretos. Uma variável de ambiente já definida prevalece sobre o `.env`, inclusive quando está vazia.
 - Configurações de chaves do ambiente na nuvem não são copiadas automaticamente para o `.env` do seu computador.
 
+Se aparecer “modelo ou referência de voz indisponível”, abra Configurações:
+
+1. Use **Verificar conexão Groq** para verificar a chave e a disponibilidade de `GROQ_MODEL`.
+2. Use **Verificar referência Fish Audio** para consultar a voz configurada, sem gerar áudio. Uma referência inexistente, privada ou inacessível precisa ser liberada para sua conta. Os erros dessa consulta identificam Fish Audio explicitamente.
+3. Se a referência estiver pronta, use **Testar voz** para verificar a geração com `FISH_AUDIO_MODEL`. Encontrar a referência não comprova que o modelo de síntese ou os créditos de API estejam disponíveis.
+
+A referência solicitada permanece `82d13948027e4be69892dd3d0104e681`, com modelo preferido `s2.1-pro`. Não há troca automática de voz/modelo. Confira permissões, modelo disponível e saldo de API dentro da sua conta. Se essa voz tiver sido removida ou não puder ser liberada, a escolha de uma nova voz precisa ser feita explicitamente pelo usuário.
+
 ## O que funciona neste MVP
 
 - Dashboard responsivo com núcleo animado em SVG/Three.js, Framer Motion e Tailwind CSS.

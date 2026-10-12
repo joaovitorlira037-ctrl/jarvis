@@ -65,7 +65,7 @@ def create_app(config=None, transport=None):
     @app.exception_handler(ProviderError)
     async def provider_error(request, exc):
         store.audit(f"provider_{exc.provider}", "error", exc.message)
-        return JSONResponse({"detail": exc.message, "provider": exc.provider}, status_code=exc.status if exc.status in {401, 403, 404, 422, 429, 503} else 502)
+        return JSONResponse({"detail": exc.message, "provider": exc.provider}, status_code=exc.status if exc.status in {401, 402, 403, 404, 422, 429, 503} else 502)
 
     @app.get("/api/health")
     async def health():
@@ -112,6 +112,10 @@ def create_app(config=None, transport=None):
     @app.get("/api/telemetry")
     async def telemetry():
         return snapshot()
+
+    @app.post("/api/providers/fish/voice/check")
+    async def verify_fish_voice():
+        return await app.state.providers.check_voice()
 
     @app.websocket("/ws/telemetry")
     async def telemetry_ws(websocket: WebSocket):

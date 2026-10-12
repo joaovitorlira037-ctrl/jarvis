@@ -350,3 +350,38 @@ for (const speechEnabled of [false, true]) {
     else await expect(page.getByRole("alert")).toHaveCount(0);
   });
 }
+
+test("settings distinguishes a missing voice reference from a successful Groq connection", async ({
+  page,
+}) => {
+  await page.route("**/api/providers/groq/check", (route) =>
+    route.fulfill({ json: { status: "verified" } }),
+  );
+  await page.route("**/api/providers/fish/voice/check", (route) =>
+    route.fulfill({
+      status: 404,
+      json: {
+        provider: "fish",
+        detail:
+          "Fish Audio: a referência de voz não foi encontrada ou não está acessível nesta conta.",
+      },
+    }),
+  );
+  await page.goto("/settings");
+  await page
+    .getByRole("button", { name: "Verificar conexão Groq", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "Groq: conexão verificada e modelo disponível.",
+  );
+  await page
+    .getByRole("button", {
+      name: "Verificar referência Fish Audio",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Fish Audio: a referência de voz",
+  );
+  await expect(page.getByRole("alert")).not.toContainText("Groq:");
+});

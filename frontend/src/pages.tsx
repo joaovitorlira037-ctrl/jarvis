@@ -555,6 +555,8 @@ export function SettingsPage({
   const [saved, setSaved] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [checking, setChecking] = useState(false);
+  const [checkingVoice, setCheckingVoice] = useState(false);
+  const [connectionNotice, setConnectionNotice] = useState("");
   const update = <K extends keyof Preferences>(
     name: K,
     value: Preferences[K],
@@ -811,8 +813,12 @@ export function SettingsPage({
               disabled={checking}
               onClick={async () => {
                 setChecking(true);
+                setConnectionNotice("");
                 try {
                   await api("/providers/groq/check", "POST");
+                  setConnectionNotice(
+                    "Groq: conexão verificada e modelo disponível.",
+                  );
                   onRefresh();
                 } catch (e) {
                   onError((e as Error).message);
@@ -824,6 +830,35 @@ export function SettingsPage({
               <RefreshCw size={14} />
               {checking ? "Verificando…" : "Verificar conexão Groq"}
             </button>
+            <button
+              className="secondary-button"
+              disabled={checkingVoice}
+              onClick={async () => {
+                setCheckingVoice(true);
+                setConnectionNotice("");
+                try {
+                  const result = await api<{ message: string }>(
+                    "/providers/fish/voice/check",
+                    "POST",
+                  );
+                  setConnectionNotice(result.message);
+                } catch (e) {
+                  onError((e as Error).message);
+                } finally {
+                  setCheckingVoice(false);
+                }
+              }}
+            >
+              <AudioLines size={14} />
+              {checkingVoice
+                ? "Verificando referência…"
+                : "Verificar referência Fish Audio"}
+            </button>
+            {connectionNotice && (
+              <p className="field-help" role="status">
+                {connectionNotice}
+              </p>
+            )}
           </div>
         </Panel>
         <Panel title="Privacidade e permissões" icon={ShieldCheck} tag="04">

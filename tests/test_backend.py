@@ -172,7 +172,7 @@ def test_fish_audio_uses_exact_reference_model_and_mp3(tmp_path):
         assert cfg.fish_key not in response.text
 
 
-@pytest.mark.parametrize('status', [401, 403, 404, 422, 429, 500])
+@pytest.mark.parametrize('status', [401, 402, 403, 404, 422, 429, 500])
 def test_fish_errors_are_explicit_and_never_use_fallback(tmp_path, status):
     cfg = config(tmp_path); cfg.fish_key = 'never-leak-this'
     def handler(request):
@@ -242,3 +242,49 @@ async def test_remote_desktop_requires_https_and_checks_actual_agent_result(tmp_
         cfg.agent_url = 'https://agent.example'
         result = await tools.run('desktop_diagnostics', '{}')
         assert result['status'] == 'success' and result['result']['source'] == 'desktop_agent'
+
+
+def test_groq_model_error_is_never_described_as_a_voice_error(tmp_path):
+    cfg = config(tmp_path); cfg.groq_key = 'private-key'
+    with TestClient(create_app(cfg, httpx.MockTransport(lambda request: httpx.Response(404, json={'error': 'private-key'})))) as client:
+        event = json.loads(client.post('/api/chat', json={'message': 'Oi'}).text)
+        assert event['type'] == 'error'
+        assert event['message'].startswith('Groq:') and 'GROQ_MODEL' in event['message']
+        assert 'voz' not in event['message']
+        assert cfg.groq_key not in event['message']
+
+
+def test_voice_metadata_check_uses_configured_reference_without_claiming_synthesis_verified(tmp_path):
+    cfg = config(tmp_path); cfg.fish_key = 'private-fish-key'
+    calls = []
+    def handler(request):
+        calls.append(request)
+        assert request.method == 'GET' and request.url.path == f'/model/{cfg.fish_voice}'
+        assert request.headers['authorization'] == f'Bearer {cfg.fish_key}'
+        return httpx.Response(200, json={'_id': cfg.fish_voice, 'type': 'tts', 'state': 'ready'})
+    with TestClient(create_app(cfg, httpx.MockTransport(handler))) as client:
+        response = client.post('/api/providers/fish/voice/check')
+        assert response.status_code == 200 and response.json()['status'] == 'accessible'
+        assert response.json()['voice_id'] == '82d13948027e4be69892dd3d0104e681'
+        assert client.get('/api/status').json()['fish']['status'] == 'configured'
+        assert len(calls) == 1 and cfg.fish_key not in response.text
+
+
+@pytest.mark.parametrize('status', [401, 403, 404])
+def test_voice_lookup_reports_access_error_without_switching_voice(tmp_path, status):
+    cfg = config(tmp_path); cfg.fish_key = 'private-fish-key'
+    with TestClient(create_app(cfg, httpx.MockTransport(lambda request: httpx.Response(status, json={'detail': 'private-fish-key'})))) as client:
+        response = client.post('/api/providers/fish/voice/check')
+        assert response.status_code == status and response.json()['provider'] == 'fish'
+        assert response.json()['detail'].startswith('Fish Audio:')
+        assert cfg.fish_key not in response.text
+        if status == 404:
+            assert 'referência de voz' in response.json()['detail']
+
+
+def test_voice_lookup_rejects_url_instead_of_voice_id(tmp_path):
+    cfg = config(tmp_path); cfg.fish_key = 'private-fish-key'; cfg.fish_voice = 'https://fish.audio/m/voice'
+    def handler(request):
+        pytest.fail('No network request should be made for an invalid reference ID')
+    with TestClient(create_app(cfg, httpx.MockTransport(handler))) as client:
+        assert client.post('/api/providers/fish/voice/check').status_code == 422
