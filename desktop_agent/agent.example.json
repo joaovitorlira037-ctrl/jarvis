@@ -1,0 +1,7 @@
+{
+  "applications": {
+    "calculator": ["gnome-calculator"],
+    "spotify": ["spotify"]
+  },
+  "allowed_website_hosts": ["www.wikipedia.org", "open.spotify.com"]
+}
