@@ -9,4 +9,6 @@ if not exist ".env" (
     exit /b 1
   )
 )
-start "" notepad.exe ".env"
+echo As chaves devem ser salvas no arquivo .env que sera aberto no Bloco de Notas.
+echo Depois de salvar, encerre o terminal do JARVIS com Ctrl+C e abra INICIAR_JARVIS.bat novamente.
+notepad.exe ".env"

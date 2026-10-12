@@ -88,6 +88,7 @@ def main():
         url = f'http://127.0.0.1:{port}'
         if is_ready(url):
             print(f'JARVIS ja esta ativo: {url}', flush=True)
+            print('Se voce alterou o .env, encerre o terminal antigo com Ctrl+C antes de abrir novamente. Reabrir somente o navegador nao recarrega as chaves.', flush=True)
             if not args.no_browser:
                 webbrowser.open(url)
             return 0

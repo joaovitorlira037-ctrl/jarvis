@@ -13,6 +13,13 @@ Obtenha suas próprias chaves em [Groq Cloud](https://console.groq.com/keys) e [
 
 O iniciador usa `scripts/launch.py`, que foi verificado no Linux; os arquivos `.bat` foram preparados para Windows, mas não foram executados em Windows neste ambiente. Se o iniciador não abrir, mantenha a janela com a mensagem de erro visível e consulte os comandos manuais abaixo.
 
+Se a chave já estiver preenchida mas o painel ainda pedir configuração:
+
+- Salve a chave no arquivo **`.env`** aberto pelo atalho, na mesma pasta de `INICIAR_JARVIS.bat`. `.env.example`, `.env.txt` e o próprio `.bat` não substituem esse arquivo.
+- Encerre a janela do **terminal** com Ctrl+C, execute o iniciador novamente e atualize a página. Fechar apenas o navegador não reinicia o servidor.
+- Execute `DIAGNOSTICAR_JARVIS.bat` para conferir a pasta, a presença das chaves e o estado do servidor. O diagnóstico não imprime valores secretos. Uma variável de ambiente já definida prevalece sobre o `.env`, inclusive quando está vazia.
+- Configurações de chaves do ambiente na nuvem não são copiadas automaticamente para o `.env` do seu computador.
+
 ## O que funciona neste MVP
 
 - Dashboard responsivo com núcleo animado em SVG/Three.js, Framer Motion e Tailwind CSS.

@@ -153,7 +153,7 @@ def create_app(config=None, transport=None):
     @app.post("/api/chat")
     async def chat(payload: ChatRequest):
         if not config.groq_key:
-            raise ProviderError("groq", 503, "Configure GROQ_API_KEY nas configurações do ambiente para conversar com JARVIS.")
+            raise ProviderError("groq", 503, "O servidor não encontrou GROQ_API_KEY. No seu computador, salve a chave no .env da pasta do JARVIS e reinicie a janela do terminal. Na nuvem, configure a chave nas configurações do ambiente.")
         if app.state.chat_lock.locked():
             raise HTTPException(409, "Uma resposta já está em andamento. Interrompa-a primeiro.")
         await app.state.chat_lock.acquire()

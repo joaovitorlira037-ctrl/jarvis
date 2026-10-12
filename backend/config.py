@@ -6,7 +6,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT / ".env")
+
+
+def load_environment(path: Path):
+    # Windows editors may prefix UTF-8 files with a BOM. Preserve injected
+    # environment bindings; an existing binding always takes precedence.
+    load_dotenv(path, encoding="utf-8-sig", override=False)
+
+
+load_environment(ROOT / ".env")
 
 
 @dataclass
