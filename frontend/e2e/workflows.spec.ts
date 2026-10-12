@@ -84,9 +84,14 @@ test("memory can be explicitly saved, edited, searched and deleted", async ({
       .getByRole("button", { name: "Salvar memória", exact: true })
       .click();
     await expect(page.getByText(content, { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Editar memória", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Editar memória", exact: true })
+      .click();
     await page.getByLabel("O que JARVIS deve lembrar?").fill(edited);
-    await page.getByRole("dialog").getByRole("button", { name: "Salvar memória", exact: true }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Salvar memória", exact: true })
+      .click();
     await expect(page.getByText(edited, { exact: true })).toBeVisible();
     await page
       .getByRole("textbox", { name: "Buscar memórias" })
@@ -297,3 +302,51 @@ test("microphone permission denial remains visible and text input works", async 
     page.getByText("MICROFONE ATIVO · silêncio encerra a gravação"),
   ).toHaveCount(0);
 });
+
+for (const speechEnabled of [false, true]) {
+  test(`text still works when audio initialization fails (speech enabled: ${speechEnabled})`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "AudioContext", {
+        value: class {
+          constructor() {
+            throw new DOMException(
+              "Audio initialization unavailable",
+              "NotSupportedError",
+            );
+          }
+        },
+      });
+    });
+    await page.route("**/api/settings", async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({
+        json: { ...(await response.json()), speech_enabled: speechEnabled },
+      });
+    });
+    let calls = 0;
+    await page.route("**/api/chat", (route) => {
+      calls++;
+      return route.fulfill({
+        contentType: "application/x-ndjson",
+        body: '{"type":"delta","text":"Texto funciona mesmo sem áudio."}\n{"type":"done","text":"Texto funciona mesmo sem áudio."}\n',
+      });
+    });
+    await page.goto("/");
+    await expect(
+      page.getByText("SISTEMA ONLINE", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("textbox", { name: "Digite um comando para JARVIS" })
+      .fill("oi");
+    await page.getByRole("button", { name: "Enviar comando" }).click();
+    await expect(
+      page.getByText("Texto funciona mesmo sem áudio.", { exact: true }),
+    ).toBeVisible();
+    expect(calls).toBe(1);
+    if (speechEnabled)
+      await expect(page.getByRole("alert")).toContainText("Voz indisponível");
+    else await expect(page.getByRole("alert")).toHaveCount(0);
+  });
+}

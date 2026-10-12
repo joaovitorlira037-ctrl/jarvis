@@ -264,7 +264,9 @@ function App() {
     let complete = false;
     let failed = false;
     try {
-      await voice.prepare();
+      // Unlock playback while this user gesture is active, but never make a
+      // text request depend on audio availability. speak() reports voice errors.
+      if (prefs?.speech_enabled) void voice.prepare().catch(() => {});
       await streamChat(text, abort.signal, (event) => {
         if (ticket !== generation.current) return;
         if (event.type === "delta") {
