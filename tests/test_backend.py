@@ -15,7 +15,7 @@ from backend.tools import Tools
 
 
 def config(tmp_path, **kwargs):
-    return Config(data_dir=tmp_path, groq_key="", fish_key="", agent_token="", access_token="", public_origin="", **kwargs)
+    return Config(**dict(dict(data_dir=tmp_path, llm_provider="groq", stt_provider="groq", openrouter_key="", groq_key="", fish_key="", agent_token="", access_token="", public_origin=""), **kwargs))
 
 
 def sse(*deltas):

@@ -17,7 +17,7 @@ async def conversation(store, providers, tools, message):
     final = ""
     for round_index in range(4):
         calls, part = {}, ""
-        async for delta in providers.groq(messages, tools.schemas()):
+        async for delta in providers.chat(messages, tools.schemas()):
             if delta.get("content"):
                 text = delta["content"]
                 part += text
@@ -32,10 +32,10 @@ async def conversation(store, providers, tools, message):
                     call["function"][key] += chunk.get("function", {}).get(key, "")
         if not calls:
             if not final.strip():
-                raise ProviderError("groq", 502, "Groq retornou uma resposta vazia. Tente novamente.")
+                raise ProviderError(providers.config.llm_provider, 502, f"{providers.config.chat_label}: resposta vazia. Tente novamente.")
             if prefs.save_history and store.preferences().save_history:
                 store.add_message("assistant", final)
-            store.audit("conversation", "success", "Resposta gerada por Groq")
+            store.audit("conversation", "success", f"Resposta gerada por {providers.config.chat_label}")
             yield {"type": "done", "text": final}
             return
         messages.append({"role": "assistant", "content": part or None, "tool_calls": list(calls.values())})
@@ -45,4 +45,4 @@ async def conversation(store, providers, tools, message):
             result = await tools.run(name, call["function"]["arguments"])
             yield {"type": "tool", "name": name, "result": result}
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
-    raise ProviderError("groq", 502, "Limite de etapas atingido. Reformule seu pedido em etapas menores.")
+    raise ProviderError(providers.config.llm_provider, 502, "Limite de etapas atingido. Reformule seu pedido em etapas menores.")

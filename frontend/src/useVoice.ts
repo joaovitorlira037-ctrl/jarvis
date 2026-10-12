@@ -37,6 +37,7 @@ export function useVoice(
   onText: (text: string) => Promise<void>,
   setState: (state: CoreState) => void,
   onError: (message: string) => void,
+  sttProvider: "browser" | "groq",
 ) {
   const [recording, setRecording] = useState(false);
   const [wakeListening, setWakeListening] = useState(false);
@@ -51,9 +52,11 @@ export function useVoice(
   const raf = useRef(0);
   const epoch = useRef(0);
   const discard = useRef(false);
+  const native = useRef<WakeRecognition | null>(null);
+  const nativeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wake = useRef<WakeRecognition | null>(null);
-  const latest = useRef({ prefs, onText, setState, onError });
-  latest.current = { prefs, onText, setState, onError };
+  const latest = useRef({ prefs, onText, setState, onError, sttProvider });
+  latest.current = { prefs, onText, setState, onError, sttProvider };
 
   const releaseMic = useCallback(() => {
     stream.current?.getTracks().forEach((track) => track.stop());
@@ -91,6 +94,9 @@ export function useVoice(
     }
     discard.current = true;
     if (recorder.current?.state === "recording") recorder.current.stop();
+    if (nativeTimer.current) clearTimeout(nativeTimer.current);
+    native.current?.abort();
+    native.current = null;
     releaseMic();
     wake.current?.abort();
     wake.current = null;
@@ -161,6 +167,7 @@ export function useVoice(
   );
 
   const finishRecording = useCallback(() => {
+    native.current?.stop();
     if (recorder.current?.state === "recording") recorder.current.stop();
   }, []);
 
@@ -168,12 +175,12 @@ export function useVoice(
     stop();
     const ticket = epoch.current;
     try {
-      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)
+      if (!navigator.mediaDevices?.getUserMedia || (latest.current.sttProvider === "groq" && !window.MediaRecorder))
         throw new Error(
           "O microfone exige HTTPS ou localhost e um navegador compatível.",
         );
       const ctx = await prepare();
-      const input = latest.current.prefs?.input_device;
+      const input = latest.current.sttProvider === "groq" ? latest.current.prefs?.input_device : "";
       const inputStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -192,6 +199,50 @@ export function useVoice(
       const source = ctx.createMediaStreamSource(inputStream);
       source.connect(node); // Intentionally no destination: microphone is never played through speakers.
       micSource.current = source;
+      if (latest.current.sttProvider === "browser") {
+        const ctor = (window as WakeWindow).SpeechRecognition || (window as WakeWindow).webkitSpeechRecognition;
+        if (!ctor) throw new Error("Reconhecimento de fala indisponível. Use Chrome/Edge ou digite a mensagem.");
+        const recognition = new ctor();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = latest.current.prefs?.language === "auto" ? navigator.language : (latest.current.prefs?.language || "pt-BR");
+        let text = "";
+        let failed = false;
+        recognition.onresult = (event) => {
+          text = Array.from({length: event.results.length}, (_, i) => event.results[i][0].transcript).join(" ").trim();
+        };
+        recognition.onerror = (event) => {
+          if (ticket !== epoch.current) return;
+          failed = true;
+          latest.current.onError(`Reconhecimento de fala interrompido (${event.error}). Confira a permissão e a conexão do navegador ou digite sua mensagem.`);
+          latest.current.setState("error");
+        };
+        recognition.onend = () => {
+          if (ticket !== epoch.current) return;
+          native.current = null;
+          if (nativeTimer.current) clearTimeout(nativeTimer.current);
+          releaseMic();
+          node.disconnect();
+          if (failed) return;
+          latest.current.setState("idle");
+          if (text) void latest.current.onText(text);
+          else latest.current.onError("Nenhuma fala foi identificada. Tente novamente ou digite sua mensagem.");
+        };
+        native.current = recognition;
+        recognition.start();
+        setRecording(true);
+        latest.current.setState("listening");
+        const samples = new Float32Array(node.fftSize);
+        const analyze = () => {
+          if (ticket !== epoch.current || native.current !== recognition) return;
+          node.getFloatTimeDomainData(samples);
+          amplitude.current = Math.min(1, Math.sqrt(samples.reduce((n, v) => n + v * v, 0) / samples.length) * 8);
+          raf.current = requestAnimationFrame(analyze);
+        };
+        analyze();
+        nativeTimer.current = setTimeout(() => recognition.stop(), 30000);
+        return;
+      }
       const mimeType = [
         "audio/webm;codecs=opus",
         "audio/ogg;codecs=opus",
@@ -275,6 +326,8 @@ export function useVoice(
       };
       analyze();
     } catch (error) {
+      native.current?.abort();
+      native.current = null;
       releaseMic();
       latest.current.onError(
         (error as Error).name === "NotAllowedError"
@@ -345,6 +398,8 @@ export function useVoice(
       player.current?.stop();
       stream.current?.getTracks().forEach((track) => track.stop());
       wake.current?.abort();
+      native.current?.abort();
+      if (nativeTimer.current) clearTimeout(nativeTimer.current);
       cancelAnimationFrame(raf.current);
       void context.current?.close();
     },

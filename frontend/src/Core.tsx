@@ -74,7 +74,8 @@ export default function Core({
     materials.push(material);
     scene.add(new THREE.Points(geometry, material));
     const resize = () => {
-      const size = canvas.current!.clientWidth;
+      if (!canvas.current) return;
+      const size = canvas.current.clientWidth;
       renderer.setSize(size, size, false);
     };
     const observer = new ResizeObserver(resize);

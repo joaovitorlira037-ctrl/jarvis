@@ -351,11 +351,11 @@ for (const speechEnabled of [false, true]) {
   });
 }
 
-test("settings distinguishes a missing voice reference from a successful Groq connection", async ({
+test("settings distinguishes a missing voice reference from a successful OpenRouter connection", async ({
   page,
 }) => {
-  await page.route("**/api/providers/groq/check", (route) =>
-    route.fulfill({ json: { status: "verified" } }),
+  await page.route("**/api/providers/chat/check", (route) =>
+    route.fulfill({ json: { status: "verified", message: "OpenRouter: conexão verificada e modelo disponível." } }),
   );
   await page.route("**/api/providers/fish/voice/check", (route) =>
     route.fulfill({
@@ -369,10 +369,10 @@ test("settings distinguishes a missing voice reference from a successful Groq co
   );
   await page.goto("/settings");
   await page
-    .getByRole("button", { name: "Verificar conexão Groq", exact: true })
+    .getByRole("button", { name: "Verificar conexão OpenRouter", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText(
-    "Groq: conexão verificada e modelo disponível.",
+    "OpenRouter: conexão verificada e modelo disponível.",
   );
   await page
     .getByRole("button", {
@@ -384,4 +384,50 @@ test("settings distinguishes a missing voice reference from a successful Groq co
     "Fish Audio: a referência de voz",
   );
   await expect(page.getByRole("alert")).not.toContainText("Groq:");
+});
+
+// Simulated native recognition events; actual browser service availability is account/network dependent.
+test("browser recognition sends text to OpenRouter without a Groq transcription request", async ({ page, context }) => {
+  await context.grantPermissions(["microphone"]);
+  await page.addInitScript(() => {
+    class Recognition {
+      continuous = false; interimResults = true; lang = "pt-BR";
+      onresult: ((event: unknown) => void) | null = null;
+      onerror = null; onend: (() => void) | null = null;
+      timer: ReturnType<typeof setTimeout> | undefined;
+      start() {
+        this.timer = setTimeout(() => {
+          this.onresult?.({ resultIndex: 0, results: [{ 0: { transcript: "Olá pelo microfone" }, isFinal: true }] });
+          this.onend?.();
+        }, 500);
+      }
+      stop() { clearTimeout(this.timer); this.onend?.(); }
+      abort() { clearTimeout(this.timer); }
+    }
+    Object.defineProperty(window, "SpeechRecognition", { value: Recognition });
+  });
+  await page.route("**/api/status", async route => {
+    const response = await route.fetch();
+    const status = await response.json();
+    await route.fulfill({ json: { ...status, transcription: {provider: "browser"} } });
+  });
+  await page.route("**/api/settings", async route => {
+    if (route.request().method() !== "GET") return route.continue();
+    const response = await route.fetch();
+    await route.fulfill({json: {...await response.json(), speech_enabled: false}});
+  });
+  let transcriptions = 0, chats = 0;
+  await page.route("**/api/transcribe", route => { transcriptions++; return route.abort(); });
+  await page.route("**/api/chat", route => {
+    chats++;
+    expect(route.request().postDataJSON().message).toBe("Olá pelo microfone");
+    return route.fulfill({contentType: "application/x-ndjson", body: '{"type":"delta","text":"Resposta OpenRouter."}\n{"type":"done","text":"Resposta OpenRouter."}\n'});
+  });
+  await page.goto("/");
+  await expect(page.getByText("SISTEMA ONLINE", {exact: true})).toBeVisible();
+  await page.getByRole("button", {name: "Iniciar escuta"}).click();
+  await expect(page.getByText("Resposta OpenRouter.", {exact: true})).toBeVisible();
+  expect(chats).toBe(1);
+  expect(transcriptions).toBe(0);
+  await expect(page.getByRole("button", {name: "Iniciar escuta"})).toBeVisible();
 });

@@ -9,11 +9,11 @@ from backend.config import Config
 
 
 @pytest.mark.live
-@pytest.mark.skipif(not (os.getenv('GROQ_API_KEY') and os.getenv('FISH_AUDIO_API_KEY')), reason='Real Groq/Fish credentials are not configured')
-def test_real_groq_reply_and_fish_mp3(tmp_path):
-    config = Config(data_dir=tmp_path)
+@pytest.mark.skipif(not (os.getenv('OPENROUTER_API_KEY') and os.getenv('FISH_AUDIO_API_KEY')), reason='Real OpenRouter/Fish credentials are not configured')
+def test_real_openrouter_reply_and_fish_mp3(tmp_path):
+    config = Config(data_dir=tmp_path, llm_provider="openrouter")
     with TestClient(create_app(config)) as client:
-        assert client.post('/api/providers/groq/check').status_code == 200
+        assert client.post('/api/providers/chat/check').status_code == 200
         response = client.post('/api/chat', json={'message': 'Reply in Portuguese with one short sentence: are you online?'})
         import json
         events = [json.loads(line) for line in response.text.splitlines()]

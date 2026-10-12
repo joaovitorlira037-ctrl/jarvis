@@ -8,7 +8,8 @@ export type CoreState =
   | "error";
 export type Connection = "missing" | "configured" | "verified";
 export interface Status {
-  groq: { status: Connection; model: string };
+  chat: { provider: "openrouter" | "groq"; label: string; status: Connection; model: string };
+  transcription: { provider: "browser" | "groq" };
   fish: { status: Connection; model: string; voice_id: string };
   desktop: { configured: boolean; enabled: boolean };
   telemetry_source: string;

@@ -24,7 +24,7 @@ def main():
     if not path.is_file():
         print('Use CONFIGURAR_CHAVES.bat nesta mesma pasta. .env.example nao e carregado como configuracao.')
     values = dotenv_values(path, encoding='utf-8-sig') if path.is_file() else {}
-    for name in ('GROQ_API_KEY', 'FISH_AUDIO_API_KEY'):
+    for name in ('OPENROUTER_API_KEY', 'GROQ_API_KEY', 'FISH_AUDIO_API_KEY'):
         value = values.get(name)
         present = isinstance(value, str) and bool(value.strip())
         placeholder = present and value.strip() in {'sua_chave_groq', 'sua_chave_fish_audio', 'cole_sua_chave_aqui'}
@@ -35,7 +35,7 @@ def main():
     # Config reports the same presence the backend would observe on a new start.
     from backend.config import Config
     config = Config()
-    print('Groq em uma nova inicializacao:', 'chave encontrada' if config.groq_key else 'chave ausente')
+    print(f'{config.chat_label} em uma nova inicializacao:', 'chave encontrada' if config.chat_key else 'chave ausente')
     print('Fish Audio em uma nova inicializacao:', 'chave encontrada' if config.fish_key else 'chave ausente')
     try:
         port = int(os.getenv('JARVIS_PORT', '8000'))
@@ -44,14 +44,14 @@ def main():
         local = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         with local.open(f'http://127.0.0.1:{port}/api/status', timeout=3) as response:
             status = json.load(response)
-        groq = status.get('groq', {}).get('status')
+        groq = status.get('chat', {}).get('status')
         fish = status.get('fish', {}).get('status')
-        print('Groq no servidor que esta aberto:', {'missing': 'chave ausente', 'configured': 'chave encontrada; ainda nao verificada', 'verified': 'conexao verificada'}.get(groq, 'estado desconhecido'))
+        print(f'{config.chat_label} no servidor que esta aberto:', {'missing': 'chave ausente', 'configured': 'chave encontrada; ainda nao verificada', 'verified': 'conexao verificada'}.get(groq, 'estado desconhecido'))
         print('Fish Audio no servidor que esta aberto:', {'missing': 'chave ausente', 'configured': 'chave encontrada; ainda nao verificada', 'verified': 'conexao verificada'}.get(fish, 'estado desconhecido'))
-        if config.groq_key and groq == 'missing':
+        if config.chat_key and groq == 'missing':
             print('ACAO: encerre o terminal antigo com Ctrl+C e abra INICIAR_JARVIS.bat desta pasta.')
-        elif config.groq_key and groq == 'configured':
-            print('ACAO: use Configuracoes > Verificar conexao Groq no painel. Presenca nao garante que a chave e valida.')
+        elif config.chat_key and groq == 'configured':
+            print(f'ACAO: use Configuracoes > Verificar conexao {config.chat_label} no painel. Presenca nao garante que a chave e valida.')
     except urllib.error.HTTPError as exc:
         print('Nao foi possivel consultar o servidor protegido. Confira a conexao pelo painel.' if exc.code == 401 else 'O servidor nao respondeu ao diagnostico.')
     except (OSError, ValueError, urllib.error.URLError):

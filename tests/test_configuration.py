@@ -29,6 +29,7 @@ def test_diagnostic_never_displays_key_values(monkeypatch, tmp_path, capsys):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, 'ROOT', tmp_path)
+    monkeypatch.setenv('LLM_PROVIDER', 'groq')
     monkeypatch.setenv('GROQ_API_KEY', 'test-value-must-never-be-printed')
     monkeypatch.setenv('FISH_AUDIO_API_KEY', 'another-test-value-never-print')
     (tmp_path / '.env').write_text('GROQ_API_KEY=test-value-must-never-be-printed\nFISH_AUDIO_API_KEY=another-test-value-never-print\n')

@@ -32,6 +32,9 @@ export default defineConfig({
       env: {
         JARVIS_DATA_DIR: path.resolve("../data/e2e"),
         GROQ_API_KEY: "",
+        OPENROUTER_API_KEY: "",
+        LLM_PROVIDER: "openrouter",
+        STT_PROVIDER: "groq",
         FISH_AUDIO_API_KEY: "",
         JARVIS_ACCESS_TOKEN: "",
       },

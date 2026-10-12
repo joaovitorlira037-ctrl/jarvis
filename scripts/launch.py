@@ -103,7 +103,7 @@ def main():
             time.sleep(.3)
         else:
             raise RuntimeError('O servidor nao ficou pronto em 30 segundos. Confira as mensagens acima.')
-        print(f'JARVIS aberto: {url}\nMantenha esta janela aberta. Ctrl+C encerra o servidor.\nPara conversa e voz, configure GROQ_API_KEY e FISH_AUDIO_API_KEY no arquivo .env.', flush=True)
+        print(f'JARVIS aberto: {url}\nMantenha esta janela aberta. Ctrl+C encerra o servidor.\nPara conversa e voz, configure OPENROUTER_API_KEY e FISH_AUDIO_API_KEY no arquivo .env.', flush=True)
         if not args.no_browser and not webbrowser.open(url):
             print('Abra o endereco acima no navegador deste computador.', flush=True)
         return process.wait()

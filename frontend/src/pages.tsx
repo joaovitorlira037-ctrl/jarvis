@@ -352,7 +352,7 @@ export function MemoryPage({ onError }: { onError: (s: string) => void }) {
               />
             </label>
             <p className="field-help">
-              Esta informação será incluída no contexto enviado ao Groq. Evite
+              Esta informação será incluída no contexto enviado ao provedor de conversa. Evite
               senhas e dados sensíveis.
             </p>
             <button className="primary-button" disabled={saving}>
@@ -402,13 +402,14 @@ const actionNames: Record<string, string> = {
   save_memory: "Memória salva",
   delete_memory: "Memória removida",
   settings: "Preferências atualizadas",
-  conversation: "Conversa com Groq",
+  conversation: "Conversa com IA",
   system_diagnostics: "Diagnóstico do servidor",
   clear_history: "Histórico apagado",
   get_time: "Consulta de horário",
   launch_application: "Abrir aplicativo",
   open_website: "Abrir site",
   provider_groq: "Conexão Groq",
+  provider_openrouter: "Conexão OpenRouter",
   provider_fish: "Conexão Fish Audio",
 };
 export function ActivityPage({ onError }: { onError: (s: string) => void }) {
@@ -711,11 +712,13 @@ export function SettingsPage({
             >
               Selecionar dispositivos de áudio <RefreshCw size={13} />
             </button>
+            <p className="setting-note">Microfone padrão: reconhecimento do Chrome/Edge, que pode enviar áudio ao serviço do navegador. Não exige chave Groq. Se falhar, digite sua mensagem. A entrada usa o padrão do sistema.</p>
             {devices.length > 0 && (
               <div className="form-columns">
                 <label>
                   Entrada
                   <select
+                    disabled={status?.transcription.provider !== "groq"}
                     value={draft.input_device}
                     onChange={(e) => update("input_device", e.target.value)}
                   >
@@ -775,13 +778,13 @@ export function SettingsPage({
         <Panel title="Conexões de inteligência" icon={Link2} tag="03">
           <div className="settings-fields">
             <div className="integration-row">
-              <div className="integration-icon groq">g</div>
+              <div className="integration-icon groq">{status?.chat.provider === "groq" ? "g" : "↗"}</div>
               <div>
-                <strong>Groq Cloud</strong>
-                <span>{status?.groq.model || "llama-3.3-70b-versatile"}</span>
+                <strong>{status?.chat.label || "OpenRouter"}</strong>
+                <span>{status?.chat.model || "openrouter/free"}</span>
               </div>
               <span
-                className={`connection-dot ${status?.groq.status === "missing" ? "warning" : ""}`}
+                className={`connection-dot ${status?.chat.status === "missing" ? "warning" : ""}`}
               />
             </div>
             <div className="integration-row">
@@ -815,10 +818,8 @@ export function SettingsPage({
                 setChecking(true);
                 setConnectionNotice("");
                 try {
-                  await api("/providers/groq/check", "POST");
-                  setConnectionNotice(
-                    "Groq: conexão verificada e modelo disponível.",
-                  );
+                  const result = await api<{message: string}>("/providers/chat/check", "POST");
+                  setConnectionNotice(result.message);
                   onRefresh();
                 } catch (e) {
                   onError((e as Error).message);
@@ -828,7 +829,7 @@ export function SettingsPage({
               }}
             >
               <RefreshCw size={14} />
-              {checking ? "Verificando…" : "Verificar conexão Groq"}
+              {checking ? "Verificando…" : `Verificar conexão ${status?.chat.label || "OpenRouter"}`}
             </button>
             <button
               className="secondary-button"
@@ -865,7 +866,7 @@ export function SettingsPage({
           <div className="settings-fields">
             <Toggle
               label="Salvar histórico de conversa"
-              description="Armazena texto localmente e o reutiliza como contexto no Groq. Ao desativar, o histórico anterior é preservado até você apagá-lo."
+              description="Armazena texto localmente e o reutiliza como contexto no provedor de conversa. Ao desativar, o histórico anterior é preservado até você apagá-lo."
               checked={draft.save_history}
               onChange={(v) => update("save_history", v)}
             />

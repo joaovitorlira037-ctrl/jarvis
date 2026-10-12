@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from .config import Config, ROOT
 from .models import ChatRequest, Decision, Login, MemoryInput, Preferences, SpeechRequest, TaskInput, TaskUpdate
 from .orchestrator import conversation
-from .providers import ProviderError, Providers, check_status
+from .providers import ProviderError, Providers
 from .storage import Store
 from .telemetry import snapshot
 from .tools import Tools
@@ -92,22 +92,21 @@ def create_app(config=None, transport=None):
     async def status():
         def state(name, key):
             return "verified" if name in app.state.verified else "configured" if key else "missing"
-        return {"groq": {"status": state("groq", config.groq_key), "model": config.groq_model}, "fish": {"status": state("fish", config.fish_key), "model": config.fish_model, "voice_id": config.fish_voice}, "desktop": {"configured": bool(config.agent_token), "enabled": store.preferences().desktop_enabled}, "telemetry_source": "backend_host", "authenticated": bool(config.access_token)}
+        return {"chat": {"provider": config.llm_provider, "label": config.chat_label, "status": state(config.llm_provider, config.chat_key), "model": config.chat_model}, "groq": {"status": state("groq", config.groq_key), "model": config.groq_model}, "fish": {"status": state("fish", config.fish_key), "model": config.fish_model, "voice_id": config.fish_voice}, "transcription": {"provider": config.stt_provider}, "desktop": {"configured": bool(config.agent_token), "enabled": store.preferences().desktop_enabled}, "telemetry_source": "backend_host", "authenticated": bool(config.access_token)}
+
+    @app.post("/api/providers/chat/check")
+    async def verify_chat():
+        result = await app.state.providers.check_chat()
+        if result["status"] == "verified":
+            app.state.verified.add(config.llm_provider)
+        return result
 
     @app.post("/api/providers/groq/check")
     async def verify_groq():
-        if not config.groq_key:
-            raise ProviderError("groq", 503, "Configure GROQ_API_KEY no servidor.")
-        try:
-            response = await app.state.client.get("https://api.groq.com/openai/v1/models", headers={"Authorization": f"Bearer {config.groq_key}"})
-            check_status(response, "groq")
-            ids = {m["id"] for m in response.json().get("data", [])}
-            if config.groq_model not in ids:
-                raise ProviderError("groq", 404, "O modelo Groq configurado não está disponível nesta conta.")
-            app.state.verified.add("groq")
-            return {"status": "verified", "model": config.groq_model}
-        except (httpx.HTTPError, ValueError) as exc:
-            raise ProviderError("groq", 502, "Falha ao verificar a conexão com Groq.") from exc
+        # Legacy route; current clients use /api/providers/chat/check.
+        if config.llm_provider == "groq":
+            return await verify_chat()
+        raise HTTPException(400, "O provedor atual é OpenRouter. Use Verificar conexão OpenRouter nas configurações.")
 
     @app.get("/api/telemetry")
     async def telemetry():
@@ -156,8 +155,8 @@ def create_app(config=None, transport=None):
 
     @app.post("/api/chat")
     async def chat(payload: ChatRequest):
-        if not config.groq_key:
-            raise ProviderError("groq", 503, "O servidor não encontrou GROQ_API_KEY. No seu computador, salve a chave no .env da pasta do JARVIS e reinicie a janela do terminal. Na nuvem, configure a chave nas configurações do ambiente.")
+        if not config.chat_key:
+            raise ProviderError(config.llm_provider, 503, f"{config.chat_label}: o servidor não encontrou {config.chat_key_name}. Salve a chave no .env da pasta do JARVIS e reinicie o terminal.")
         if app.state.chat_lock.locked():
             raise HTTPException(409, "Uma resposta já está em andamento. Interrompa-a primeiro.")
         await app.state.chat_lock.acquire()
@@ -166,7 +165,7 @@ def create_app(config=None, transport=None):
             try:
                 async for event in conversation(store, app.state.providers, app.state.tools, payload.message):
                     if event["type"] == "done":
-                        app.state.verified.add("groq")
+                        app.state.verified.add(config.llm_provider)
                     yield json.dumps(event, ensure_ascii=False) + "\n"
             except ProviderError as exc:
                 store.audit(f"provider_{exc.provider}", "error", exc.message)
@@ -183,6 +182,9 @@ def create_app(config=None, transport=None):
 
     @app.post("/api/transcribe")
     async def transcribe(file: UploadFile):
+        if config.stt_provider != "groq":
+            await file.close()
+            raise HTTPException(409, "A transcrição atual usa o reconhecimento do navegador. Atualize a página e use Chrome ou Edge.")
         allowed = {"audio/webm", "audio/ogg", "audio/wav", "audio/mpeg", "audio/mp4", "audio/x-wav", "video/webm"}
         media = (file.content_type or "").split(";")[0]
         if media not in allowed:

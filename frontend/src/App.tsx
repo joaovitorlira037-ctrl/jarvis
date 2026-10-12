@@ -110,6 +110,7 @@ function App() {
     async (text) => sendRef.current(text),
     setState,
     onError,
+    status?.transcription.provider || "browser",
   );
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
@@ -767,14 +768,14 @@ function App() {
                       </div>
                       <p className="mic-hint">
                         {voice.recording
-                          ? "MICROFONE ATIVO · silêncio encerra a gravação"
+                          ? (status?.transcription.provider === "browser" ? "MICROFONE ATIVO · reconhecimento do navegador" : "MICROFONE ATIVO · silêncio encerra a gravação")
                           : voice.wakeListening
                             ? `MICROFONE ATIVO · aguardando “${prefs?.wake_phrase}”`
                             : "Ative o microfone ou digite um comando abaixo"}
                       </p>
                       <div className="stage-bottom">
                         <span>
-                          <Brain size={11} /> GROQ CLOUD
+                          <Brain size={11} /> {status?.chat.label || "OpenRouter"}
                         </span>
                         <span>
                           <AudioLines size={11} /> FISH AUDIO VOICE
@@ -818,7 +819,7 @@ function App() {
                               </div>
                               <p>À sua disposição.</p>
                               <span>O que vamos fazer hoje?</span>
-                              {status?.groq.status === "missing" && (
+                              {status?.chat.status === "missing" && (
                                 <Link to="/settings" className="setup-inline">
                                   Configure as conexões para começar
                                   <ArrowUpRight size={11} />
@@ -1204,9 +1205,9 @@ function App() {
         </span>
         <div className="provider-status">
           <Link to="/settings">
-            <i className={status?.groq.status === "missing" ? "warning" : ""} />
-            GROQ{" "}
-            <span>{status ? connectionNames[status.groq.status] : "—"}</span>
+            <i className={status?.chat.status === "missing" ? "warning" : ""} />
+            {status?.chat.label || "OpenRouter"}{" "}
+            <span>{status ? connectionNames[status.chat.status] : "—"}</span>
           </Link>
           <Link to="/settings">
             <i className={status?.fish.status === "missing" ? "warning" : ""} />
